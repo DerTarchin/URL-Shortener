@@ -27,15 +27,11 @@ params = {
 def gitCommitAndPush(shorturl):
   print "Updating server..."
   child = pexpect.spawn("bash")
-  # child.logfile = sys.stdout
   child.sendline("cd /Users/Hizal/dev/sites/hiz.al/")
-  child.sendline("git add .")
-  child.sendline('git commit -m "/' + shorturl + '..."')
-  child.sendline("git push origin master")
-  child.sendline('git commit -m "/' + shorturl + '" --allow-empty') # empty push
-  child.sendline("git push origin master")
+  child.sendline('git add .; git commit -m "/' + shorturl + '..."; git push origin master; git commit -m "/' + shorturl + '" --allow-empty; git push origin master');
+  child.readline()
   child.sendline("exit")
-  print child.read()
+  child.read()
   print "... done."
 
 def setparams():
