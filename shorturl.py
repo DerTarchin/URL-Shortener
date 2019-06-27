@@ -1,10 +1,5 @@
-import sys
-import requests
+import sys, requests, string, os, shutil, pexpect, re, random
 from bs4 import BeautifulSoup
-import shutil
-import os
-import pexpect
-import re
 
 SITE_DIR = "/Users/Hizal/dev/sites/hiz.al/"
 
@@ -73,7 +68,10 @@ def process():
   global args, params
   if len(args) == 1 and not params["list"] and not params["remove"]:
     print "ERROR: not enough arguments."
-    print "Format: shorturl <shorturlval> <www.longurl.com>"
+    print "Format: shorturl [opt:<shorturlVal>] <www.longurl.com> [opt:-t/title <titleStr>]"
+    print "Format: shorturl -l/list <list.txt>"
+    print "Format: shorturl -r/remove <shorturlVal>"
+    print "Format: shorturl -reindex"
     sys.exit()
   urls = []
 
@@ -101,7 +99,11 @@ def process():
         longurl = result.group(1)[:-1] if result.group(1)[-1] == "'" else result.group(1)
         urls.append([shorturl, longurl])
   else:
-    urls = [[args[1],args[2]]]
+    if len(args) == 2:
+      generated = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(5))
+      urls = [[generated, args[1]]]
+    else:
+      urls = [[args[1],args[2]]]
     if "http://" not in urls[-1][1] and "https://" not in urls[-1][1]:
           urls[-1][1] = "http://" + urls[-1][1]
 
@@ -130,6 +132,7 @@ def process():
         print "Cancelling process..."
         sys.exit()
 
+    print longurl
     res = requests.get(longurl)
     parsed = BeautifulSoup(res.text, features="html5lib")
     metas = parsed.find_all('meta')
