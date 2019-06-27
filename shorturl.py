@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import shutil
 import os
 import pexpect
+import re
 
 SITE_DIR = "/Users/Hizal/dev/sites/hiz.al/"
 
@@ -28,6 +29,7 @@ params = {
   'list': False, # replace original files
   'remove': False, # remove given shorturl
   'title': False, # custom title
+  'reindex': False # recreate every shorturl with updated code
 }
 
 def gitCommitAndPush(shorturl):
@@ -44,9 +46,10 @@ def setparams():
   global args, params, supported
   if len(args) > 1:
     if "-h" in args or "-help" in args:
-      print "-l/list >> convert from list (.txt file)"
+      print "-l/list >> convert from list (.txt file, each line as {shorturl [space] url})"
       print "-r/remove >> remove shorturl"
       print "-t/title >> custom page title (defualts to shorturl)"
+      print "-reindex >> recreate existing shorturls"
       print "-h/help >> help"
       print "\nFormat: shorturl shorturlval www.longurl.com (becomes hiz.al/shorturlval)"
       sys.exit()
@@ -62,6 +65,9 @@ def setparams():
       argIndex = args.index("-t") if "-t" in args else args.index("-title")
       params["title"] = args.pop(argIndex + 1)
       del args[argIndex]
+    if "-reindex" in args:
+      argIndex = args.index("-reindex")
+      params["reindex"] = True
 
 def process():
   global args, params
@@ -87,6 +93,13 @@ def process():
         urls.append(line.replace("\n","").split(" "))
         if "http://" not in urls[-1][1] and "https://" not in urls[-1][1]:
           urls[-1][1] = "http://" + urls[-1][1]
+  elif params["reindex"]:
+    for shorturl in next(os.walk(SITE_DIR[:-1]))[1]:
+      if shorturl[0] == '.': continue
+      with open(SITE_DIR + shorturl + '/index.html', "r") as f:
+        result = re.search('URL=\'(.*)" />', f.read())
+        longurl = result.group(1)[:-1] if result.group(1)[-1] == "'" else result.group(1)
+        urls.append([shorturl, longurl])
   else:
     urls = [[args[1],args[2]]]
     if "http://" not in urls[-1][1] and "https://" not in urls[-1][1]:
@@ -95,18 +108,24 @@ def process():
   for pair in urls:
     shorturl = pair[0]
     longurl = pair[1]
+    
+    if params["reindex"]:
+      print "Recreating", shorturl, "(" + longurl + ")"
+    
     # create index
     if not os.path.exists(SITE_DIR + shorturl):
       os.makedirs(SITE_DIR + shorturl)
     else:
-      print shorturl, "already exists! Do you want to replace it?"
-      cont = raw_input("Y/N: ")
-      if cont.lower() == "y":
+      if not params["reindex"]:
+        print shorturl, "already exists! Do you want to replace it?"
+        cont = raw_input("Y/N: ")
+      if params["reindex"] or cont.lower() == "y":
         try:
           os.remove(SITE_DIR + shorturl + "/index.html")
         except:
-          print "Error occured while removing"
-        print "Removing"
+          print "Error occured while removing ", shorturl
+        if not params["reindex"]:
+          print "Removing"
       else: 
         print "Cancelling process..."
         sys.exit()
@@ -121,6 +140,7 @@ def process():
     mainDesc = mainDesc[0] if len(mainDesc) else None
     ogDesc = [ meta.attrs['content'] for meta in metas if 'property' in meta.attrs and meta.attrs['property'] == 'og:description' ]
     ogDesc = ogDesc[0] if len(ogDesc) else None
+    page_desc = None
     if mainDesc: page_desc = mainDesc.strip()
     if ogDesc: page_desc = ogDesc.strip()
     page_desc = page_desc if page_desc else "URL shortener by Hizal Celik"
@@ -129,6 +149,7 @@ def process():
     ogTitle = [ meta.attrs['content'] for meta in metas if 'property' in meta.attrs and meta.attrs['property'] == 'og:title' ]
     ogTitle = ogTitle[0] if len(ogTitle) else None
     if len(titleTags): page_title = titleTags[0].text.strip()
+    page_title = None
     if ogTitle: page_title = ogTitle.strip()
     if params["title"]: page_title = params["title"]
     else: page_title = page_title if page_title else ("hiz.al/" + shorturl)
